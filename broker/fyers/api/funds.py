@@ -2,13 +2,12 @@
 
 import os
 import json
-import logging
 from typing import Dict, Any, Optional
 import httpx
 from utils.httpx_client import get_httpx_client
+from utils.logging import get_logger
 
-# Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def get_margin_data(auth_token: str) -> Dict[str, str]:
     """
