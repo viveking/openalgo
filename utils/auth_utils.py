@@ -71,13 +71,19 @@ def async_master_contract_download(broker):
     
     return master_contract_status
 
-def handle_auth_success(auth_token, user_session_key, broker, feed_token=None, user_id=None):
+from database.broker_db import add_broker_to_user, get_user_brokers, set_active_broker
+
+def handle_auth_success(auth_token, user, broker, feed_token=None, user_id=None):
     """
     Handles common tasks after successful authentication.
     - Sets session parameters
     - Stores auth token in the database
     - Initiates asynchronous master contract download
     """
+    # Add broker to user
+    add_broker_to_user(user.id, broker, auth_token, feed_token)
+    set_active_broker(user.id, broker)
+
     # Set session parameters
     session['logged_in'] = True
     session['AUTH_TOKEN'] = auth_token
@@ -85,7 +91,7 @@ def handle_auth_success(auth_token, user_session_key, broker, feed_token=None, u
         session['FEED_TOKEN'] = feed_token  # Store feed token in session if available
     if user_id:
         session['USER_ID'] = user_id  # Store user ID in session if available
-    session['user_session_key'] = user_session_key
+    session['user_session_key'] = user.username
     session['broker'] = broker
     
     # Set session expiry and login time
@@ -93,10 +99,10 @@ def handle_auth_success(auth_token, user_session_key, broker, feed_token=None, u
     session.permanent = True
     set_session_login_time()  # Set the login timestamp
     
-    logger.info(f"User {user_session_key} logged in successfully with broker {broker}")
+    logger.info(f"User {user.username} logged in successfully with broker {broker}")
 
     # Store auth token in database
-    inserted_id = upsert_auth(user_session_key, auth_token, broker, feed_token=feed_token, user_id=user_id)
+    inserted_id = upsert_auth(user.username, auth_token, broker, feed_token=feed_token, user_id=user_id)
     if inserted_id:
         logger.info(f"Database record upserted with ID: {inserted_id}")
         # Initialize master contract status for this broker
@@ -105,7 +111,7 @@ def handle_auth_success(auth_token, user_session_key, broker, feed_token=None, u
         thread.start()
         return redirect(url_for('dashboard_bp.dashboard'))
     else:
-        logger.error(f"Failed to upsert auth token for user {user_session_key}")
+        logger.error(f"Failed to upsert auth token for user {user.username}")
         return render_template('broker.html', error_message="Failed to store authentication token. Please try again.")
 
 def handle_auth_failure(error_message, forward_url='broker.html'):

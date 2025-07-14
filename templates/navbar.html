@@ -126,6 +126,16 @@
                         Profile
                     </a>
                 </li>
+                {% if session.user_role == 'admin' %}
+                <li>
+                    <a href="{{ url_for('auth.user_management') }}" class="text-base">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197" />
+                        </svg>
+                        Users
+                    </a>
+                </li>
+                {% endif %}
                 <li>
                     <a href="{{ url_for('api_key_bp.manage_api_key') }}" class="text-base">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

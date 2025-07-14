@@ -158,33 +158,39 @@ async def receive_and_print_data(websocket, duration=30):
         except:
             pass
 
-async def test_ltp_subscribe():
+def test_ltp_subscribe():
     """Test LTP subscription"""
     print("\n===== TESTING LTP SUBSCRIPTION =====")
+    asyncio.run(test_ltp_subscribe_async())
+
+def test_quote_subscribe():
+    """Test Quote subscription"""
+    print("\n===== TESTING QUOTE SUBSCRIPTION =====")
+    asyncio.run(test_quote_subscribe_async())
+
+def test_depth_subscribe():
+    """Test Depth subscription"""
+    print("\n===== TESTING DEPTH SUBSCRIPTION =====")
+    asyncio.run(test_depth_subscribe_async())
+
+async def test_ltp_subscribe_async():
     websocket = await connect_and_authenticate(WS_URL, API_KEY)
-    
     if websocket:
         success = await subscribe_to_data(websocket, [RELIANCE_NSE, NIFTY_INDEX], mode=SUBSCRIPTION_MODES["LTP"])
         if success:
             await receive_and_print_data(websocket, duration=10)
         await websocket.close()
 
-async def test_quote_subscribe():
-    """Test Quote subscription"""
-    print("\n===== TESTING QUOTE SUBSCRIPTION =====")
+async def test_quote_subscribe_async():
     websocket = await connect_and_authenticate(WS_URL, API_KEY)
-    
     if websocket:
         success = await subscribe_to_data(websocket, [RELIANCE_NSE, BANKNIFTY_INDEX], mode=SUBSCRIPTION_MODES["Quote"])
         if success:
             await receive_and_print_data(websocket, duration=10)
         await websocket.close()
 
-async def test_depth_subscribe():
-    """Test Depth subscription"""
-    print("\n===== TESTING DEPTH SUBSCRIPTION =====")
+async def test_depth_subscribe_async():
     websocket = await connect_and_authenticate(WS_URL, API_KEY)
-    
     if websocket:
         success = await subscribe_to_data(websocket, [RELIANCE_NSE], mode=SUBSCRIPTION_MODES["Depth"])
         if success:

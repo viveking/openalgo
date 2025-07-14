@@ -3,6 +3,7 @@ from flask import current_app as app
 from limiter import limiter  # Import the limiter instance
 from utils.config import get_broker_api_key, get_broker_api_secret, get_login_rate_limit_min, get_login_rate_limit_hour
 from utils.auth_utils import handle_auth_success, handle_auth_failure
+from database.user_db import find_user_by_username
 from utils.logging import get_logger
 import http.client
 import json
@@ -412,6 +413,11 @@ def broker_callback(broker,para=None):
         forward_url = 'broker.html'
     
     if auth_token:
+        # Get user object
+        user = find_user_by_username(session['user'])
+        if not user:
+            return handle_auth_failure("User not found.", forward_url='broker.html')
+
         # Store broker in session
         session['broker'] = broker
         logger.info(f'Successfully connected broker: {broker}')
@@ -437,10 +443,10 @@ def broker_callback(broker,para=None):
                     return handle_auth_failure("No user account found. Please login first.", forward_url='broker.html')
             
             # Pass the feed token and user_id to handle_auth_success
-            return handle_auth_success(auth_token, session['user'], broker, feed_token=feed_token, user_id=user_id)
+            return handle_auth_success(auth_token, user, broker, feed_token=feed_token, user_id=user_id)
         else:
             # Pass just the feed token to handle_auth_success (other brokers don't have user_id)
-            return handle_auth_success(auth_token, session['user'], broker, feed_token=feed_token)
+            return handle_auth_success(auth_token, user, broker, feed_token=feed_token)
     else:
         return handle_auth_failure(error_message, forward_url=forward_url)
     

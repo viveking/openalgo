@@ -35,6 +35,8 @@ Base.query = db_session.query_property()
 # Define a cache for the usernames with a max size and a 30-second TTL
 username_cache = TTLCache(maxsize=1024, ttl=30)
 
+from sqlalchemy.orm import relationship
+
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
@@ -42,7 +44,9 @@ class User(Base):
     email = Column(String(120), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)  # Increased length for Argon2 hash
     totp_secret = Column(String(32), nullable=False)  # For TOTP-based password reset
-    is_admin = Column(Boolean, default=False)
+    role = Column(String(20), default='trader', nullable=False) # Roles: admin, trader
+    is_active = Column(Boolean, default=True)
+    brokers = relationship("UserBroker", back_populates="user")
 
     def set_password(self, password):
         """Hash password using Argon2 with pepper"""
@@ -78,15 +82,15 @@ def init_db():
     logger.info("Initializing User DB")
     Base.metadata.create_all(bind=engine)
 
-def add_user(username, email, password, is_admin=False):
+def add_user(username, email, password, role='trader'):
     try:
         # Generate TOTP secret for the user
         totp_secret = pyotp.random_base32()
         user = User(
-            username=username, 
-            email=email, 
+            username=username,
+            email=email,
             totp_secret=totp_secret,
-            is_admin=is_admin
+            role=role
         )
         user.set_password(password)
         db_session.add(user)
@@ -103,24 +107,24 @@ def authenticate_user(username, password):
         user = username_cache[cache_key]
         # Ensure that user is an instance of User
         if isinstance(user, User) and user.check_password(password):
-            return True
+            return user
         else:
             del username_cache[cache_key]  # Remove invalid cache entry
-            return False
+            return None
     else:
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             username_cache[cache_key] = user  # Cache the User object
-            return True
-        return False
+            return user
+        return None
 
 def find_user_by_email(email):
     """Find user by email for password reset"""
     return User.query.filter_by(email=email).first()
 
-def find_user_by_username():
-    """Find admin user"""
-    return User.query.filter_by(is_admin=True).first()
+def find_user_by_username(username):
+    """Find user by username"""
+    return User.query.filter_by(username=username).first()
 
 def rehash_all_passwords():
     """

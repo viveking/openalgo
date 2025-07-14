@@ -3,7 +3,7 @@ from limiter import limiter  # Import the limiter instance
 from extensions import socketio
 import os
 from database.auth_db import upsert_auth
-from database.user_db import authenticate_user, User, db_session, find_user_by_username, find_user_by_email  # Import the function
+from database.user_db import authenticate_user, User, db_session, find_user_by_username, find_user_by_email, add_user as add_new_user, User
 import re
 from utils.session import check_session_validity
 import secrets
@@ -42,8 +42,10 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        if authenticate_user(username, password):
+        user = authenticate_user(username, password)
+        if user:
             session['user'] = username  # Set the username in the session
+            session['user_role'] = user.role # Set the user role in the session
             logger.info(f"Login success for user: {username}")
             # Redirect to broker login without marking as fully logged in
             return jsonify({'status': 'success'}), 200
@@ -54,12 +56,14 @@ def login():
 @limiter.limit(LOGIN_RATE_LIMIT_MIN)
 @limiter.limit(LOGIN_RATE_LIMIT_HOUR)
 def broker_login():
-    if session.get('logged_in'):
-        return redirect(url_for('dashboard_bp.dashboard'))
+    if 'user' not in session:
+        return redirect(url_for('auth.login'))
+
+    user = find_user_by_username(session['user'])
+    if not user:
+        return redirect(url_for('auth.logout'))
+
     if request.method == 'GET':
-        if 'user' not in session:
-            return redirect(url_for('auth.login'))
-            
         # Get broker configuration (already validated at startup)
         BROKER_API_KEY = os.getenv('BROKER_API_KEY')
         BROKER_API_SECRET = os.getenv('BROKER_API_SECRET')
@@ -190,7 +194,7 @@ def logout():
         username = session['user']
         
         #writing to database      
-        inserted_id = upsert_auth(username, "", "", revoke=True)
+        inserted_id = upsert_auth(username, "", "")
         if inserted_id is not None:
             logger.info(f"Database Upserted record with ID: {inserted_id}")
             logger.info(f'Auth Revoked in the Database for user: {username}')
@@ -204,3 +208,43 @@ def logout():
 
     # Redirect to login page after logout
     return redirect(url_for('auth.login'))
+
+@auth_bp.route('/users', methods=['GET'])
+@check_session_validity
+def user_management():
+    user = find_user_by_username(session['user'])
+    if not user or user.role != 'admin':
+        return redirect(url_for('dashboard_bp.dashboard'))
+
+    users = User.query.all()
+    return render_template('users.html', users=users)
+
+@auth_bp.route('/users/add', methods=['POST'])
+@check_session_validity
+def add_user():
+    user = find_user_by_username(session['user'])
+    if not user or user.role != 'admin':
+        return redirect(url_for('dashboard_bp.dashboard'))
+
+    username = request.form['username']
+    email = request.form['email']
+    password = request.form['password']
+    role = request.form['role']
+
+    add_new_user(username, email, password, role)
+
+    return redirect(url_for('auth.user_management'))
+
+@auth_bp.route('/users/toggle_access/<int:user_id>', methods=['POST'])
+@check_session_validity
+def toggle_user_access(user_id):
+    user = find_user_by_username(session['user'])
+    if not user or user.role != 'admin':
+        return redirect(url_for('dashboard_bp.dashboard'))
+
+    user_to_toggle = User.query.get(user_id)
+    if user_to_toggle:
+        user_to_toggle.is_active = not user_to_toggle.is_active
+        db_session.commit()
+
+    return redirect(url_for('auth.user_management'))

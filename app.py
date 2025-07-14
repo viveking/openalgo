@@ -44,6 +44,7 @@ from database.chartink_db import init_db as ensure_chartink_tables_exists
 from database.traffic_db import init_logs_db as ensure_traffic_logs_exists
 from database.latency_db import init_latency_db as ensure_latency_tables_exists
 from database.strategy_db import init_db as ensure_strategy_tables_exists
+from database.broker_db import init_db as ensure_broker_tables_exists
 
 from utils.plugin_loader import load_broker_auth_functions
 
@@ -219,6 +220,7 @@ def setup_environment(app):
         ensure_traffic_logs_exists()
         ensure_latency_tables_exists()
         ensure_strategy_tables_exists()
+        ensure_broker_tables_exists()
 
     # Conditionally setup ngrok in development environment
     if os.getenv('NGROK_ALLOW') == 'TRUE':

@@ -65,7 +65,6 @@ class Auth(Base):
     feed_token = Column(Text, nullable=True)  # Make it nullable as not all brokers will provide this
     broker = Column(String(20), nullable=False)
     user_id = Column(String(255), nullable=True)  # Add user_id column
-    is_revoked = Column(Boolean, default=False)
 
 class ApiKeys(Base):
     __tablename__ = 'api_keys'
@@ -95,7 +94,7 @@ def decrypt_token(encrypted_token):
         logger.error(f"Error decrypting token: {e}")
         return None
 
-def upsert_auth(name, auth_token, broker, feed_token=None, user_id=None, revoke=False):
+def upsert_auth(name, auth_token, broker, feed_token=None, user_id=None):
     """Store encrypted auth token and feed token if provided"""
     encrypted_token = encrypt_token(auth_token)
     encrypted_feed_token = encrypt_token(feed_token) if feed_token else None
@@ -106,9 +105,8 @@ def upsert_auth(name, auth_token, broker, feed_token=None, user_id=None, revoke=
         auth_obj.feed_token = encrypted_feed_token
         auth_obj.broker = broker
         auth_obj.user_id = user_id
-        auth_obj.is_revoked = revoke
     else:
-        auth_obj = Auth(name=name, auth=encrypted_token, feed_token=encrypted_feed_token, broker=broker, user_id=user_id, is_revoked=revoke)
+        auth_obj = Auth(name=name, auth=encrypted_token, feed_token=encrypted_feed_token, broker=broker, user_id=user_id)
         db_session.add(auth_obj)
     db_session.commit()
     return auth_obj.id
@@ -118,14 +116,14 @@ def get_auth_token(name):
     cache_key = f"auth-{name}"
     if cache_key in auth_cache:
         auth_obj = auth_cache[cache_key]
-        if isinstance(auth_obj, Auth) and not auth_obj.is_revoked:
+        if isinstance(auth_obj, Auth):
             return decrypt_token(auth_obj.auth)
         else:
             del auth_cache[cache_key]
             return None
     else:
         auth_obj = get_auth_token_dbquery(name)
-        if isinstance(auth_obj, Auth) and not auth_obj.is_revoked:
+        if isinstance(auth_obj, Auth):
             auth_cache[cache_key] = auth_obj
             return decrypt_token(auth_obj.auth)
         return None
@@ -133,7 +131,7 @@ def get_auth_token(name):
 def get_auth_token_dbquery(name):
     try:
         auth_obj = Auth.query.filter_by(name=name).first()
-        if auth_obj and not auth_obj.is_revoked:
+        if auth_obj:
             return auth_obj
         else:
             logger.warning(f"No valid auth token found for name '{name}'.")
@@ -147,14 +145,14 @@ def get_feed_token(name):
     cache_key = f"feed-{name}"
     if cache_key in feed_token_cache:
         auth_obj = feed_token_cache[cache_key]
-        if isinstance(auth_obj, Auth) and not auth_obj.is_revoked:
+        if isinstance(auth_obj, Auth):
             return decrypt_token(auth_obj.feed_token) if auth_obj.feed_token else None
         else:
             del feed_token_cache[cache_key]
             return None
     else:
         auth_obj = get_feed_token_dbquery(name)
-        if isinstance(auth_obj, Auth) and not auth_obj.is_revoked:
+        if isinstance(auth_obj, Auth):
             feed_token_cache[cache_key] = auth_obj
             return decrypt_token(auth_obj.feed_token) if auth_obj.feed_token else None
         return None
@@ -162,7 +160,7 @@ def get_feed_token(name):
 def get_feed_token_dbquery(name):
     try:
         auth_obj = Auth.query.filter_by(name=name).first()
-        if auth_obj and not auth_obj.is_revoked:
+        if auth_obj:
             return auth_obj
         else:
             logger.warning(f"No valid feed token found for name '{name}'.")
@@ -246,7 +244,7 @@ def get_broker_name(provided_api_key):
     if user_id:
         try:
             auth_obj = Auth.query.filter_by(name=user_id).first()
-            if auth_obj and not auth_obj.is_revoked:
+            if auth_obj:
                 # Cache the broker name
                 broker_cache[provided_api_key] = auth_obj.broker
                 return auth_obj.broker
@@ -265,7 +263,7 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
     if user_id:
         try:
             auth_obj = Auth.query.filter_by(name=user_id).first()
-            if auth_obj and not auth_obj.is_revoked:
+            if auth_obj:
                 decrypted_token = decrypt_token(auth_obj.auth)
                 if include_feed_token:
                     decrypted_feed_token = decrypt_token(auth_obj.feed_token) if auth_obj.feed_token else None

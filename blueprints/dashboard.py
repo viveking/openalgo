@@ -1,5 +1,7 @@
 from flask import Blueprint, render_template, session, redirect, url_for, g, jsonify, request
 from database.auth_db import get_auth_token
+from database.user_db import find_user_by_username
+from database.broker_db import get_user_brokers, get_user_broker, set_active_broker
 from importlib import import_module
 from utils.session import check_session_validity
 import multiprocessing
@@ -24,34 +26,38 @@ scalper_process = None
 @dashboard_bp.route('/dashboard')
 @check_session_validity
 def dashboard():
-    login_username = session['user']
-    AUTH_TOKEN = get_auth_token(login_username)
-    
-    if AUTH_TOKEN is None:
-        logger.warning(f"No auth token found for user {login_username}")
+    user = find_user_by_username(session['user'])
+    if not user:
         return redirect(url_for('auth.logout'))
 
-    broker = session.get('broker')
-    if not broker:
-        logger.error("Broker not set in session")
-        return "Broker not set in session", 400
-    
-    get_margin_data_func = dynamic_import(broker)
-    if get_margin_data_func is None:
-        logger.error(f"Failed to import broker module for {broker}")
-        return "Failed to import broker module", 500
+    brokers = get_user_brokers(user.id)
+    active_broker_name = session.get('broker')
+    active_broker = None
+    margin_data = None
 
-    margin_data = get_margin_data_func(AUTH_TOKEN)
-    
-    # Check if margin_data is empty (authentication failed)
-    if not margin_data:
-        logger.error(f"Failed to get margin data for user {login_username} - authentication may have expired")
+    if active_broker_name:
+        active_broker = get_user_broker(user.id, active_broker_name)
+
+    if active_broker:
+        get_margin_data_func = dynamic_import(active_broker.broker_name)
+        if get_margin_data_func:
+            margin_data = get_margin_data_func(active_broker.broker_token)
+
+    return render_template('dashboard.html', margin_data=margin_data, brokers=brokers, active_broker=active_broker)
+
+@dashboard_bp.route('/switch_broker/<broker_name>')
+@check_session_validity
+def switch_broker(broker_name):
+    user = find_user_by_username(session['user'])
+    if not user:
         return redirect(url_for('auth.logout'))
-    
-    # Check if all values are zero (likely authentication error)
-    if (margin_data.get('availablecash') == '0.00' and 
-        margin_data.get('collateral') == '0.00' and
-        margin_data.get('utiliseddebits') == '0.00'):
-        logger.warning(f"All margin data values are zero for user {login_username} - possible authentication issue")
-    
-    return render_template('dashboard.html', margin_data=margin_data)
+
+    broker = get_user_broker(user.id, broker_name)
+    if broker:
+        set_active_broker(user.id, broker_name)
+        session['broker'] = broker_name
+        session['AUTH_TOKEN'] = broker.broker_token
+        if broker.broker_feed_token:
+            session['FEED_TOKEN'] = broker.broker_feed_token
+
+    return redirect(url_for('dashboard_bp.dashboard'))
