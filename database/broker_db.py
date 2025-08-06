@@ -5,7 +5,6 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignK
 from sqlalchemy.orm import scoped_session, sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from utils.logging import get_logger
-from .user_db import User
 
 logger = get_logger(__name__)
 
@@ -30,7 +29,6 @@ class UserBroker(Base):
     broker_token = Column(Text, nullable=False)
     broker_feed_token = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
-    user = relationship("User", back_populates="brokers")
 
 def init_db():
     """Initialize the broker database"""
