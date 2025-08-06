@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignK
 from sqlalchemy.orm import scoped_session, sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from utils.logging import get_logger
+from .user_db import User
 
 logger = get_logger(__name__)
 
