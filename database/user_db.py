@@ -46,6 +46,7 @@ class User(Base):
     totp_secret = Column(String(32), nullable=False)  # For TOTP-based password reset
     role = Column(String(20), default='trader', nullable=False) # Roles: admin, trader
     is_active = Column(Boolean, default=True)
+    brokers = relationship("UserBroker")
 
     def set_password(self, password):
         """Hash password using Argon2 with pepper"""
