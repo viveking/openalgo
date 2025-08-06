@@ -212,6 +212,7 @@ def setup_environment(app):
         # Ensure all the tables exist
         ensure_auth_tables_exists()
         ensure_user_tables_exists()
+        ensure_broker_tables_exists()
         ensure_master_contract_tables_exists()
         ensure_api_log_tables_exists()
         ensure_analyzer_tables_exists()
@@ -220,7 +221,6 @@ def setup_environment(app):
         ensure_traffic_logs_exists()
         ensure_latency_tables_exists()
         ensure_strategy_tables_exists()
-        ensure_broker_tables_exists()
 
     # Conditionally setup ngrok in development environment
     if os.getenv('NGROK_ALLOW') == 'TRUE':
